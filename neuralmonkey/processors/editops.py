@@ -57,8 +57,6 @@ class Postprocess(object):
 
         return reconstructed_seq
 # pylint: enable=too-few-public-methods
-
-
 KEEP = '<keep>'
 DELETE = '<delete>'
 

@@ -7,7 +7,7 @@ See http://arxiv.org/abs/1606.07481
 
 import tensorflow as tf
 from neuralmonkey.nn.projection import linear
-
+from neuralmonkey.vocabulary import STEP_TOKEN_INDEX
 
 class Attention(object):
     # pylint: disable=unused-argument,too-many-instance-attributes
@@ -61,7 +61,7 @@ class Attention(object):
             self.v_bias = tf.get_variable(
                 "AttnV_b", [], initializer=tf.constant_initializer(0))
 
-    def attention(self, query_state) -> tf.Tensor:
+    def attention(self, query_state, input_idx) -> tf.Tensor:
         """Put attention masks on att_states_reshaped
            using hidden_features and query.
         """
@@ -78,7 +78,7 @@ class Attention(object):
             # pylint: disable=invalid-name
             # code copied from tensorflow. Suggestion: rename the variables
             # according to the Bahdanau paper
-            s = self.get_logits(y)
+            s = self.get_logits(y, input_idx)
 
             if self.input_weights is None:
                 a = tf.nn.softmax(s)
@@ -96,7 +96,7 @@ class Attention(object):
 
             return tf.reshape(d, [-1, self.attn_size])
 
-    def get_logits(self, y):
+    def get_logits(self, y, input_idx):
         # Attention mask is a softmax of v^T * tanh(...).
         return tf.reduce_sum(
             self.v * tf.tanh(self.hidden_features + y), [2, 3]) + self.v_bias
@@ -123,7 +123,7 @@ class CoverageAttention(Attention):
         self.fertility = 1e-8 + self.attention_fertility * tf.sigmoid(
             tf.reduce_sum(self.fertility_weights * self.attention_states, [2]))
 
-    def get_logits(self, y):
+    def get_logits(self, y, input_idx):
         coverage = sum(
             self.attentions_in_time) / self.fertility * self.input_weights
 
@@ -134,3 +134,29 @@ class CoverageAttention(Attention):
             [2, 3])
 
         return logits
+
+class HardAttention(Attention):
+
+    def __init__(self, attention_states, scope,
+                 input_weights=None, attention_fertility=None):
+
+        super(HardAttention, self).__init__(
+            attention_states, scope,
+            input_weights=input_weights,
+            attention_fertility=attention_fertility)
+
+        self.batch_size = tf.shape(attention_states)[0]
+        self.sequence_len = tf.shape(attention_states)[1]
+        self.indices = tf.zeros([self.batch_size], dtype=tf.int32, name="indice_matrix")
+
+    def get_logits(self, y, input_idx):
+        import pdb; pdb.set_trace()
+        self.indices = tf.add(
+            self.indices,
+            tf.cast(tf.equal(input_idx, STEP_TOKEN_INDEX), tf.int32))
+        logits = tf.sequence_mask(self.indices, self.sequence_len)
+        logits = tf.logical_xor(
+            logits,
+            tf.sequence_mask(self.indices - 1, self.sequence_len))
+
+        return tf.cast(logits, tf.float32)

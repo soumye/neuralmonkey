@@ -19,14 +19,15 @@ PAD_TOKEN = "<pad>"
 START_TOKEN = "<s>"
 END_TOKEN = "</s>"
 UNK_TOKEN = "<unk>"
+STEP_TOKEN = "<step>"
 
-_SPECIAL_TOKENS = [PAD_TOKEN, START_TOKEN, END_TOKEN, UNK_TOKEN]
+_SPECIAL_TOKENS = [PAD_TOKEN, START_TOKEN, END_TOKEN, UNK_TOKEN, STEP_TOKEN]
 
 PAD_TOKEN_INDEX = 0
 START_TOKEN_INDEX = 1
 END_TOKEN_INDEX = 2
 UNK_TOKEN_INDEX = 3
-
+STEP_TOKEN_INDEX = 4
 
 def _is_special_token(word: str) -> bool:
     """Check whether word is a special token (such as <pad> or <s>).
@@ -41,7 +42,6 @@ def _is_special_token(word: str) -> bool:
             or word == START_TOKEN
             or word == END_TOKEN
             or word == UNK_TOKEN)
-
 
 def from_file(path: str) -> 'Vocabulary':
     """Loads vocabulary from a pickled file
@@ -62,7 +62,6 @@ def from_file(path: str) -> 'Vocabulary':
     log("Pickled vocabulary loaded. Size: {} words".format(len(vocabulary)))
     vocabulary.log_sample()
     return vocabulary
-
 
 def from_wordlist(path: str, encoding: str = "utf-8") -> 'Vocabulary':
     """Loads vocabulary from a wordlist.
@@ -88,7 +87,6 @@ def from_wordlist(path: str, encoding: str = "utf-8") -> 'Vocabulary':
         .format(len(vocabulary)))
     vocabulary.log_sample()
     return vocabulary
-
 
 # pylint: disable=too-many-arguments
 # helper function, this number of parameters is needed
@@ -151,7 +149,6 @@ def from_dataset(datasets: List[Dataset], series_ids: List[str], max_size: int,
 
     return vocabulary
 
-
 def from_bpe(path: str, encoding: str = "utf-8") -> 'Vocabulary':
     """Loads vocabulary from Byte-pair encoding merge list.
 
@@ -189,7 +186,6 @@ def from_bpe(path: str, encoding: str = "utf-8") -> 'Vocabulary':
         .format(len(vocab)))
     vocab.log_sample()
     return vocab
-
 
 def initialize_vocabulary(directory: str, name: str,
                           datasets: List[Dataset] = None,

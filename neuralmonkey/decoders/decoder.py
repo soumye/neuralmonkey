@@ -150,15 +150,6 @@ class Decoder(ModelPart):
                     initializer=tf.constant_initializer(
                         - math.log(len(self.vocabulary))))
 
-            # POSLEDNI TRAIN INPUT SE V DEKODOVACI FUNKCI NEPOUZIJE
-            # (jen jako target)
-            embedded_train_inputs = self.embed_and_dropout(
-                self.train_inputs[:-1])
-
-            # POZOR TADY SE NEDELA DROPOUT
-            embedded_go_symbols = tf.nn.embedding_lookup(self.embedding_matrix,
-                                                         self.go_symbols)
-
             # fetch train attention objects
             self._train_attention_objects = {}
             # type: Dict[Attentive, tf.Tensor]
@@ -170,8 +161,8 @@ class Decoder(ModelPart):
                         if isinstance(e, Attentive)}
 
             self.train_logits, _, _ = self._decoding_loop(
-                embedded_go_symbols,
-                train_inputs=embedded_train_inputs,
+                self.go_symbols,
+                train_inputs=self.train_inputs[:-1],
                 train_mode=True)
 
             assert not tf.get_variable_scope().reuse
@@ -189,7 +180,7 @@ class Decoder(ModelPart):
             (self.runtime_logits,
              self.runtime_rnn_states,
              self.runtime_mask) = self._decoding_loop(
-                 embedded_go_symbols,
+                 self.go_symbols,
                  train_mode=False)
 
             train_targets = tf.transpose(self.train_inputs)
@@ -280,8 +271,9 @@ class Decoder(ModelPart):
         else:
             self.embedding_matrix = self.embeddings_encoder.embedding_matrix
 
-    def embed_and_dropout(self, inputs: tf.Tensor) -> tf.Tensor:
-        """Embed the input using the embedding matrix and apply dropout
+    def embed(self, inputs: tf.Tensor, apply_dropout: bool = False) -> tf.Tensor:
+        """Embed the input using the embedding matrix and optionally apply
+        dropout.
 
         Arguments:
             inputs: The Tensor to be embedded and dropped out.
@@ -289,9 +281,13 @@ class Decoder(ModelPart):
         with tf.variable_scope("embed_inputs"):
             embedded = tf.nn.embedding_lookup(
                 self.embedding_matrix, inputs)
-            return dropout(embedded,
+
+            if apply_dropout:
+                return dropout(embedded,
                            self.dropout_keep_prob,
                            self.train_mode)
+            else:
+                return embedded
 
     def _logit_function(self, state: tf.Tensor) -> tf.Tensor:
         state = dropout(state, self.dropout_keep_prob, self.train_mode)
@@ -314,6 +310,7 @@ class Decoder(ModelPart):
     def step(self,
              att_objects: List[Attention],
              input_: tf.Tensor,
+             input_idx_: tf.Tensor,
              prev_state: tf.Tensor,
              prev_attns: List[tf.Tensor]):
 
@@ -331,7 +328,7 @@ class Decoder(ModelPart):
             cell_output, state = cell(x, prev_state)
 
             # Run the attention mechanism.
-            attns = [a.attention(cell_output) for a in att_objects]
+            attns = [a.attention(cell_output, input_idx_) for a in att_objects]
 
             if self._conditional_gru:
                 x_2 = linear(
@@ -399,16 +396,18 @@ class Decoder(ModelPart):
             # choose the input
             if step_logits is None:
                 assert i == 0
-                inp = go_symbols[0]
+                inp_idx = go_symbols[0]
+                inp = self.embed(inp_idx)
             elif train_mode:
-                inp = train_inputs[i - 1]
+                inp_idx = train_inputs[i - 1]
+                inp = self.embed(inp_idx)
             else:
-                prev_word_index = tf.argmax(step_logits, 1)
-                inp = self.embed_and_dropout(prev_word_index)
+                inp_idx = tf.argmax(step_logits, 1)
+                inp = self.embed(inp_idx, apply_dropout=True)
 
             # perform the RNN step
             step_logits, state, attns = self.step(
-                att_objects, inp, state, attns)
+                att_objects, inp, inp_idx, state, attns)
 
             next_word_id = tf.argmax(step_logits, axis=1)
             has_just_finished = tf.equal(next_word_id, END_TOKEN_INDEX)
