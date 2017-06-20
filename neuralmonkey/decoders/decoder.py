@@ -271,7 +271,9 @@ class Decoder(ModelPart):
         else:
             self.embedding_matrix = self.embeddings_encoder.embedding_matrix
 
-    def embed(self, inputs: tf.Tensor, apply_dropout: bool = False) -> tf.Tensor:
+    def embed(self,
+              inputs: tf.Tensor,
+              apply_dropout: bool = False) -> tf.Tensor:
         """Embed the input using the embedding matrix and optionally apply
         dropout.
 
@@ -284,10 +286,9 @@ class Decoder(ModelPart):
 
             if apply_dropout:
                 return dropout(embedded,
-                           self.dropout_keep_prob,
-                           self.train_mode)
-            else:
-                return embedded
+                               self.dropout_keep_prob,
+                               self.train_mode)
+            return embedded
 
     def _logit_function(self, state: tf.Tensor) -> tf.Tensor:
         state = dropout(state, self.dropout_keep_prob, self.train_mode)

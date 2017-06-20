@@ -135,22 +135,24 @@ class CoverageAttention(Attention):
 
         return logits
 
-class HardAttention(Attention):
+class MonotonicAttention(Attention):
 
     def __init__(self, attention_states, scope,
                  input_weights=None, attention_fertility=None):
 
-        super(HardAttention, self).__init__(
+        super(MonotonicAttention, self).__init__(
             attention_states, scope,
             input_weights=input_weights,
             attention_fertility=attention_fertility)
 
         self.batch_size = tf.shape(attention_states)[0]
         self.sequence_len = tf.shape(attention_states)[1]
-        self.indices = tf.zeros([self.batch_size], dtype=tf.int32, name="indice_matrix")
+        self.indices = tf.zeros([self.batch_size],
+                                dtype=tf.int32,
+                                name="indice_matrix")
+        self.indices = self.indices + 1
 
     def get_logits(self, y, input_idx):
-        import pdb; pdb.set_trace()
         self.indices = tf.add(
             self.indices,
             tf.cast(tf.equal(input_idx, STEP_TOKEN_INDEX), tf.int32))
