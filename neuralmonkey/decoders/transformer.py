@@ -198,20 +198,33 @@ class TransformerDecoder(SequenceDecoder):
     def train_logits(self) -> tf.Tensor:
         last_layer = self.layer(self.depth, self.embedded_train_inputs,
                                 tf.transpose(self.train_mask))
-
-        temporal_states = dropout(last_layer.temporal_states,
-                                  self.dropout_keep_prob, self.train_mode)
-
         # matmul with output matrix
         # t_states shape: (batch, time, channels)
         # dec_w shape: (channels, vocab)
+        logits_unbiased = tf.nn.conv1d(
+            last_layer.temporal_states, tf.expand_dims(self.decoding_w, 0), 1,
+            "SAME")
 
-        logits = tf.nn.conv1d(
-            temporal_states, tf.expand_dims(self.decoding_w, 0), 1, "SAME")
+        # shape (batch, time, vocab)
+        logits = logits_unbiased + tf.reshape(self.decoding_b, [1, 1, -1])
 
-        return tf.transpose(
-            logits + tf.expand_dims(tf.expand_dims(self.decoding_b, 0), 0),
-            perm=[1, 0, 2])
+        # return logits in time-major shape
+        return tf.transpose(logits, perm=[1, 0, 2])
+
+    @tensor
+    def train_xents(self) -> tf.Tensor:
+        train_targets = tf.transpose(self.train_inputs)
+
+        return tf.contrib.seq2seq.sequence_loss(
+            tf.transpose(self.train_logits, perm=[1, 0, 2]),
+            train_targets,
+            tf.transpose(self.train_mask),
+            average_across_batch=False)
+    #       softmax_loss_function=(
+    #           lambda labels, logits:
+    #             tf.losses.softmax_cross_entropy(
+    #                 tf.one_hot(labels, len(self.vocabulary)),
+    #             logits, label_smoothing=0.1)))
 
     def get_initial_loop_state(self) -> LoopState:
 
@@ -264,8 +277,7 @@ class TransformerDecoder(SequenceDecoder):
                                     tf.transpose(mask))
 
             # (batch, state_size)
-            output_state = tf.transpose(
-                last_layer.temporal_states, perm=[1, 0, 2])[-1]
+            output_state = last_layer.temporal_states[:, -1, :]
 
             logits = tf.matmul(output_state, self.decoding_w) + self.decoding_b
 
@@ -316,6 +328,6 @@ class TransformerDecoder(SequenceDecoder):
 
         assert all(self.self_attentions)
         assert all(self.inter_attentions)
-
-        dependencies = set(self.self_attentions + self.inter_attentions)
+        # TODO ten self.encoder by tu nemel vubec bejt to je bug
+        dependencies = set(self.self_attentions + self.inter_attentions + [self.encoder])
         return default_dependencies.union(dependencies)
