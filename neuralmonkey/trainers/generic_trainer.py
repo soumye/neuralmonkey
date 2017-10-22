@@ -56,14 +56,14 @@ class GenericTrainer(object):
 
             # unweighted losses for fetching
             self.losses = [o.loss for o in objectives] + [l1_value, l2_value]
-            tf.summary.scalar('train_l1', l1_value,
+            tf.summary.scalar("train_l1", l1_value,
                               collections=["summary_train"])
-            tf.summary.scalar('train_l2', l2_value,
+            tf.summary.scalar("train_l2", l2_value,
                               collections=["summary_train"])
 
             # if the objective does not have its own gradients,
             # just use TF to do the derivative
-            with tf.name_scope('gradient_collection'):
+            with tf.name_scope("gradient_collection"):
                 differentiable_loss_sum = sum(
                     (o.weight if o.weight is not None else 1) * o.loss
                     for o in objectives
@@ -81,6 +81,9 @@ class GenericTrainer(object):
                         [implicit_gradients] + other_gradients)
                 else:
                     gradients = implicit_gradients
+
+                tf.summary.scalar("train_opt_cost", differentiable_loss_sum,
+                                  collections=["summary_train"])
 
             if clip_norm:
                 assert clip_norm > 0.0
