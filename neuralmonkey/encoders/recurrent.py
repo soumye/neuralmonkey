@@ -107,10 +107,7 @@ class RecurrentEncoder(ModelPart, TemporalStatefulWithOutput):
                RNN_CELL_TYPES[self.rnn_cell_str](self.rnn_size))
 
     def feed_dict(self, dataset: Dataset, train: bool = False) -> FeedDict:
-        fd = self.input_sequence.feed_dict(dataset, train)
-        fd[self.train_mode] = train
-
-        return fd
+        return {self.train_mode: train}
 
 
 class SentenceEncoder(RecurrentEncoder):
